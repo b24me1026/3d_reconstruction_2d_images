@@ -6,7 +6,7 @@ Helper / example launcher for multi_view_reconstruct.py.
 Edit the IMAGE_PATHS list below with the actual paths to your 2-3 object photos,
 then just run:
 
-    cd TripoSR
+    cd Replica_X
     python run_multi_view.py
 """
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     ]
 
     print("\n" + "=" * 65)
-    print("  🚀  Launching multi-view 3D reconstruction …")
+    print("  🚀  Launching Replica_X multi-view 3D reconstruction …")
     print("=" * 65)
     print("  Images :", IMAGE_PATHS)
     print("  Output :", OUTPUT_DIR)

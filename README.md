@@ -1,15 +1,19 @@
 # 3D Reconstruction from 2D Images
 
-A deep learning pipeline to reconstruct high-fidelity 3D objects from 2D photographs using **TripoSR** and a custom multi-view fusion system.
+A deep learning pipeline to reconstruct high-fidelity 3D objects from 2D photographs using **Replica_X** — a custom multi-view 3D reconstruction engine with real photo color projection.
 
 ---
 
 ## 📌 Overview
 
-This project implements two approaches to 3D object reconstruction:
+This project implements a multi-view 3D reconstruction pipeline that:
 
-1. **Multi-View TripoSR Pipeline** — Takes 2–3 photos of an object from different angles and produces a complete, colored 3D mesh (`.glb` / `.obj`)
-2. **Pix3D Bulk Reconstruction** — Batch point cloud reconstruction using a CNN-based encoder-decoder trained on the Pix3D dataset
+1. Takes **2–3 photos** of an object from different angles
+2. Removes background and normalizes each image
+3. Runs a deep learning model to generate a **triplane neural 3D representation**
+4. Extracts a detailed **triangle mesh** using Marching Cubes
+5. Projects **real photo pixel colors** back onto the mesh with visibility weighting
+6. Exports a fully colored `.glb` / `.obj` 3D model
 
 ---
 
@@ -17,20 +21,19 @@ This project implements two approaches to 3D object reconstruction:
 
 ```
 DC_Project/
-├── TripoSR/
-│   ├── tsr/                        # Core TripoSR model modules
-│   │   ├── system.py               # Main TSR model class
+├── Replica_X/
+│   ├── tsr/                        # Core model modules
+│   │   ├── system.py               # Main model class
 │   │   ├── utils.py                # Background removal, preprocessing
 │   │   ├── bake_texture.py         # Texture baking utilities
 │   │   └── models/                 # NeRF renderer, isosurface, transformers
 │   ├── multi_view_reconstruct.py   # Core multi-view fusion logic
 │   ├── run_multi_view.py           # ⭐ Main launcher — edit & run this
-│   ├── run.py                      # Single-image TripoSR runner
+│   ├── run.py                      # Single-image reconstruction runner
 │   ├── run_triposr_sample.py       # Quick sample test
 │   ├── requirements.txt            # Dependencies
 │   ├── input_images/               # Place your input photos here
 │   └── output_fused/               # 3D mesh outputs saved here
-├── bulk_reconstruct.py             # Pix3D batch reconstruction script
 ├── Dc_final.ipynb                  # Main project notebook
 └── README.md
 ```
@@ -42,13 +45,13 @@ DC_Project/
 ### 1. Install dependencies
 
 ```bash
-cd TripoSR
+cd Replica_X
 pip install -r requirements.txt
 ```
 
 ### 2. Set your input images
 
-Open `TripoSR/run_multi_view.py` and edit the image paths:
+Open `Replica_X/run_multi_view.py` and edit the image paths:
 
 ```python
 IMAGE_PATHS = [
@@ -60,13 +63,13 @@ IMAGE_PATHS = [
 ### 3. Run reconstruction
 
 ```bash
-cd TripoSR
+cd Replica_X
 python run_multi_view.py
 ```
 
 ### 4. View output
 
-Results are saved to `TripoSR/output_fused/`:
+Results are saved to `Replica_X/output_fused/`:
 - `fused_mesh.glb` — open with Windows 3D Viewer or [gltf.report](https://gltf.report)
 - `fused_mesh.obj` — open with Blender or any 3D software
 
@@ -89,10 +92,3 @@ Results are saved to `TripoSR/output_fused/`:
 - Python 3.8+
 - CUDA-compatible GPU (recommended: 4GB+ VRAM)
 - PyTorch, rembg, trimesh, open3d
-
----
-
-## 📚 References
-
-- [TripoSR by StabilityAI](https://github.com/VAST-AI-Research/TripoSR)
-- [Pix3D Dataset](http://pix3d.csail.mit.edu/)

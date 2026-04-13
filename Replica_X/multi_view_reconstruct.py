@@ -1,12 +1,12 @@
 """
 multi_view_reconstruct.py
 --------------------------
-Feed 2-3 photos of the same object from different angles to TripoSR.
+Feed 2-3 photos of the same object from different angles to Replica_X.
 
 Pipeline
 --------
 1. Preprocess each image (background removal, foreground crop).
-2. Run TripoSR on BEST view only (or optionally average scene codes).
+2. Run Replica_X on BEST view only (or optionally average scene codes).
 3. Extract ONE clean mesh at high marching-cubes resolution.
 4. **Clean up** mesh: remove small disconnected components (floating fragments).
 5. **Project real photo colors** back onto each mesh vertex using orthographic
@@ -15,7 +15,7 @@ Pipeline
 
 Usage
 -----
-cd TripoSR
+cd Replica_X
 python multi_view_reconstruct.py view1.png view2.png [view3.png] \\
        --output-dir output_fused \\
        [--mc-resolution 384] \\
@@ -82,7 +82,7 @@ timer = Timer()
 # ---------------------------------------------------------------------------
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Multi-view coloured 3D reconstruction with TripoSR."
+        description="Multi-view coloured 3D reconstruction with Replica_X."
     )
     p.add_argument("images", nargs="+",
                    help="2 or 3 image paths taken from different angles. "
@@ -92,7 +92,7 @@ def parse_args():
     p.add_argument("--pretrained-model-name-or-path",
                    default="stabilityai/TripoSR")
     p.add_argument("--chunk-size", default=8192, type=int,
-                   help="Chunk size for TripoSR renderer (lower = less VRAM).")
+                   help="Chunk size for Replica_X renderer (lower = less VRAM).")
     p.add_argument("--mc-resolution", default=384, type=int,
                    help="Marching-cubes resolution (higher = more detail, slower). Default: 384.")
     p.add_argument("--no-remove-bg", action="store_true",
@@ -119,7 +119,7 @@ def parse_args():
     p.add_argument("--mc-threshold", default=15.0, type=float,
                    help="Marching cubes SDF density threshold. LOWER = include more thin/fine "
                         "structures (chair legs, frames). HIGHER = only dense solid parts. "
-                        "Default: 15.0 (TripoSR default is 25.0 which cuts thin objects). "
+                        "Default: 15.0 (Replica_X default is 25.0 which cuts thin objects). "
                         "Try 10.0-20.0 for furniture with thin legs.")
     p.add_argument("--rembg-model", default="isnet-general-use",
                    help="rembg model for background removal. 'isnet-general-use' works best "
@@ -133,7 +133,7 @@ def parse_args():
 # ---------------------------------------------------------------------------
 def preprocess_image(image_path, rembg_session, no_remove_bg,
                      foreground_ratio, save_dir, index):
-    """Load, optionally remove background, and normalise for TripoSR input."""
+    """Load, optionally remove background, and normalise for Replica_X input."""
     if no_remove_bg:
         image = Image.open(image_path).convert("RGB")
     else:
@@ -155,7 +155,7 @@ def preprocess_image(image_path, rembg_session, no_remove_bg,
 
         image = resize_foreground(image, foreground_ratio)
         arr = np.array(image).astype(np.float32) / 255.0
-        # composite onto grey background (what TripoSR expects)
+        # composite onto grey background (what Replica_X expects)
         arr = arr[:, :, :3] * arr[:, :, 3:4] + (1 - arr[:, :, 3:4]) * 0.5
         image = Image.fromarray((arr * 255.0).astype(np.uint8))
 
@@ -170,7 +170,7 @@ def preprocess_image(image_path, rembg_session, no_remove_bg,
 def average_scene_codes(scene_codes_list: list) -> torch.Tensor:
     """
     Stack per-view scene codes along the batch dim and mean-pool them.
-    TripoSR scene codes are triplane feature tensors of shape (1, C, H, W)
+    Replica_X scene codes are triplane feature tensors of shape (1, C, H, W)
     (or similar). Averaging them in latent space fuses complementary
     shape/appearance information from all views into one consistent volume.
     """
@@ -218,15 +218,15 @@ def project_real_colors_to_vertices(
     Parameters
     ----------
     mesh : trimesh.Trimesh
-        The fused mesh (in TripoSR's canonical coordinate space).
+        The fused mesh (in Replica_X's canonical coordinate space).
     preprocessed_images : list of PIL.Image
         The preprocessed (grey-bg) versions of every input photo.
     blend_mode : str
         'weighted' weights each view by max(0, n·v)  (visibility dot product).
         'mean'     gives each view equal weight.
     ortho_radius : float
-        Extent of the object in TripoSR's normalised coordinate space
-        (scene radius).  TripoSR uses ±0.87 by default.
+        Extent of the object in Replica_X's normalised coordinate space
+        (scene radius).  Replica_X uses ±0.87 by default.
     """
     n_views = len(preprocessed_images)
     rotations = _get_view_rotations(n_views)
@@ -301,7 +301,7 @@ def project_real_colors_to_vertices(
         accumulated_weight[no_hit] = 1.0
         logging.info(
             f"  {int(no_hit.sum())} vertices had no valid projection; "
-            f"using TripoSR NeRF colours as fallback."
+            f"using Replica_X NeRF colours as fallback."
         )
     elif no_hit.any():
         accumulated_color[no_hit] = 0.5   # neutral grey
@@ -324,7 +324,7 @@ def cleanup_mesh(mesh: trimesh.Trimesh, threshold: float = 0.02) -> trimesh.Trim
     """
     Remove disconnected components smaller than `threshold` fraction of the
     largest component's volume.  This eliminates floating fragment artifacts
-    that TripoSR sometimes produces for thin/complex objects.
+    that Replica_X sometimes produces for thin/complex objects.
 
     Parameters
     ----------
@@ -421,9 +421,9 @@ def main():
         logging.info("CUDA not available — using CPU (slower).")
 
     # ------------------------------------------------------------------
-    # Load TripoSR
+    # Load Replica_X
     # ------------------------------------------------------------------
-    timer.start("Loading TripoSR model")
+    timer.start("Loading Replica_X model")
     model = TSR.from_pretrained(
         args.pretrained_model_name_or_path,
         config_name="config.yaml",
@@ -431,7 +431,7 @@ def main():
     )
     model.renderer.set_chunk_size(args.chunk_size)
     model.to(device)
-    timer.end("Loading TripoSR model")
+    timer.end("Loading Replica_X model")
 
     rembg_session = None if args.no_remove_bg else rembg.new_session(args.rembg_model)
     logging.info(f"  rembg model: {args.rembg_model if not args.no_remove_bg else 'disabled'}")
@@ -455,33 +455,33 @@ def main():
         timer.end(f"Preprocess view {idx+1}")
 
     # ------------------------------------------------------------------
-    # Step 2 — Run TripoSR on the relevant image(s)
+    # Step 2 — Run Replica_X on the relevant image(s)
     # ------------------------------------------------------------------
     logging.info(f"\n{'='*60}")
-    logging.info(f"  Step 2: TripoSR inference  (fusion-mode={args.fusion_mode})")
+    logging.info(f"  Step 2: Replica_X inference  (fusion-mode={args.fusion_mode})")
     logging.info(f"{'='*60}")
 
     if args.fusion_mode == "single_best":
-        # Only run TripoSR on the first (best/front) image for geometry.
+        # Only run Replica_X on the first (best/front) image for geometry.
         # Other views are used only for color projection.
         logging.info(
             "  Using FIRST image for geometry (single_best mode). "
             "All views will contribute to color."
         )
-        timer.start("TripoSR inference (best view)")
+        timer.start("Replica_X inference (best view)")
         with torch.no_grad():
             fused_scene_code = model([preprocessed_images[0]], device=device)
-        timer.end("TripoSR inference (best view)")
+        timer.end("Replica_X inference (best view)")
         logging.info(f"  Scene code shape: {fused_scene_code.shape}")
     else:
         # average mode: run on all views and average the triplane codes
         per_view_scene_codes = []
         for idx, img in enumerate(preprocessed_images):
-            timer.start(f"TripoSR inference view {idx+1}")
+            timer.start(f"Replica_X inference view {idx+1}")
             with torch.no_grad():
                 scene_codes = model([img], device=device)
             per_view_scene_codes.append(scene_codes)
-            timer.end(f"TripoSR inference view {idx+1}")
+            timer.end(f"Replica_X inference view {idx+1}")
 
         # ------------------------------------------------------------------
         # Step 3 — Average scene codes in latent space → fused code
@@ -613,3 +613,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
